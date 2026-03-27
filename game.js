@@ -1098,10 +1098,17 @@ class Game {
     // Sound effects
     this.sfx = {
       swing:   new Audio('swing.mp3'),
-      hole:    new Audio('hit-the-hole.mp3'),
       fanfare: new Audio('goblin fanfair.mp3'),
+      // Pool of 6 tap sounds so rapid-fire taps can overlap
+      holeTaps: Array.from({length: 6}, () => { const a = new Audio('hit-the-hole.mp3'); a.volume = 0.6; return a; }),
+      _tapIdx: 0,
     };
-    for (const s of Object.values(this.sfx)) s.volume = 0.7;
+    this.sfx.swing.volume = 0.7;
+    this.sfx.fanfare.volume = 0.7;
+
+    // Rim-tap state: track previous cup distance + cooldown
+    this._prevCupDist = Infinity;
+    this._tapCooldown = 0;
 
     this.resize();
     this.bindEvents();
@@ -1727,6 +1734,17 @@ class Game {
       return;
     }
 
+    // Rim-tap sound: ball was approaching cup and just started moving away = bounce off rim
+    if (this._tapCooldown > 0) this._tapCooldown--;
+    if (dc < CUP_PULL_R && dc > this._prevCupDist && this._tapCooldown === 0) {
+      const tap = this.sfx.holeTaps[this.sfx._tapIdx % this.sfx.holeTaps.length];
+      this.sfx._tapIdx++;
+      tap.currentTime = 0;
+      tap.play().catch(() => {});
+      this._tapCooldown = 4; // ~4 substeps between taps so rapid bounces don't stack
+    }
+    this._prevCupDist = dc < CUP_PULL_R ? dc : Infinity;
+
     // Ball stopped
     if (spd < STOP_SPEED) {
       ball.vx = 0; ball.vy = 0;
@@ -1742,10 +1760,7 @@ class Game {
     this.state = 'sinking';
     this.ball.vx = 0; this.ball.vy = 0;
     this.consumeActiveEffect();
-
-    // Ball touches the hole
-    this.sfx.hole.currentTime = 0;
-    this.sfx.hole.play().catch(() => {});
+    this._prevCupDist = Infinity; // reset tap tracker
     let t = 0;
     const interval = setInterval(() => {
       t++;
