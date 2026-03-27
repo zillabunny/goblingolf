@@ -1,0 +1,365 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Goblin Golf</title>
+<style>
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  body { background: #0a1205; overflow: hidden; font-family: 'Segoe UI', system-ui, sans-serif; }
+
+  #canvas { display: block; position: fixed; top: 0; left: 0; }
+
+  /* HUD */
+  #hud {
+    position: fixed; top: 0; left: 0; right: 0;
+    display: flex; justify-content: space-between; align-items: center;
+    padding: 12px 20px; pointer-events: none;
+    background: linear-gradient(to bottom, rgba(0,0,0,0.75) 0%, transparent 100%);
+  }
+  .hud-block {
+    display: flex; flex-direction: column; align-items: center;
+    color: #fff; text-shadow: 0 1px 4px rgba(0,0,0,0.8);
+  }
+  .hud-label { font-size: 10px; text-transform: uppercase; letter-spacing: 1.5px; opacity: 0.6; color: #aadd88; }
+  .hud-value { font-size: 26px; font-weight: 700; line-height: 1.1; }
+  .hud-value.good { color: #66ff99; }
+  .hud-value.bad  { color: #ff6655; }
+  .hud-value.par  { color: #fff; }
+
+  /* Powerup bar */
+  #powerup-bar {
+    position: fixed; bottom: 24px; left: 50%; transform: translateX(-50%);
+    display: flex; gap: 10px;
+  }
+  .pu-slot { pointer-events: auto; cursor: pointer; }
+  .pu-slot {
+    width: 54px; height: 54px; border-radius: 10px; cursor: pointer;
+    border: 2px solid rgba(100,180,80,0.3);
+    background: rgba(0,15,0,0.7);
+    display: flex; flex-direction: column; align-items: center; justify-content: center;
+    color: #fff; font-size: 22px; position: relative;
+    transition: all 0.2s;
+  }
+  .pu-slot .pu-count {
+    position: absolute; top: 2px; right: 5px;
+    font-size: 11px; font-weight: 700; color: #aaff66;
+  }
+  .pu-slot.active {
+    border-color: #aaff66;
+    box-shadow: 0 0 14px rgba(170,255,102,0.55);
+  }
+  .pu-slot .pu-key { font-size: 9px; opacity: 0.45; color: #88cc44; }
+
+  /* Screens */
+  .screen {
+    position: fixed; inset: 0;
+    display: flex; flex-direction: column; align-items: center; justify-content: center;
+    background: rgba(0,8,0,0.88);
+    color: #fff; z-index: 100;
+    transition: opacity 0.4s;
+  }
+  .screen.hidden { display: none; }
+
+  /* Title */
+  h1.title {
+    font-size: 72px; font-weight: 900; text-align: center;
+    background: linear-gradient(135deg, #aaff44, #44dd00, #88ff22);
+    -webkit-background-clip: text; -webkit-text-fill-color: transparent;
+    filter: drop-shadow(0 0 24px rgba(100,255,60,0.45));
+    margin-bottom: 4px; line-height: 1;
+  }
+  .goblin-emoji { font-size: 56px; margin-bottom: 8px; -webkit-text-fill-color: initial; }
+  .subtitle {
+    font-size: 13px; opacity: 0.55; margin-bottom: 48px;
+    letter-spacing: 2.5px; text-transform: uppercase; color: #88cc44;
+  }
+
+  /* Buttons */
+  .btn {
+    padding: 14px 42px; font-size: 18px; font-weight: 800;
+    border: none; border-radius: 40px; cursor: pointer;
+    background: linear-gradient(135deg, #66ff22, #33cc00);
+    color: #0a1a00; letter-spacing: 1px; text-transform: uppercase;
+    transition: transform 0.15s, box-shadow 0.15s;
+    box-shadow: 0 4px 24px rgba(80,220,20,0.4);
+  }
+  .btn:hover { transform: scale(1.05); box-shadow: 0 6px 32px rgba(80,220,20,0.6); }
+  .btn:active { transform: scale(0.97); }
+  .btn.secondary {
+    background: rgba(100,180,60,0.12); color: #88cc44;
+    border: 2px solid rgba(100,180,60,0.3);
+    box-shadow: none; margin-top: 14px;
+  }
+
+  /* Hole complete */
+  #hole-screen .hole-title { font-size: 38px; font-weight: 800; color: #aaff66; margin-bottom: 6px; }
+  #hole-screen .hole-score { font-size: 72px; font-weight: 900; line-height: 1; }
+  #hole-screen .hole-score.eagle  { color: #ffd700; text-shadow: 0 0 20px rgba(255,215,0,0.6); }
+  #hole-screen .hole-score.birdie { color: #66ff99; text-shadow: 0 0 14px rgba(100,255,150,0.4); }
+  #hole-screen .hole-score.par    { color: #ffffff; }
+  #hole-screen .hole-score.bogey  { color: #ffaa44; }
+  #hole-screen .hole-score.double { color: #ff6655; }
+  #hole-screen .score-label { font-size: 18px; opacity: 0.75; margin-bottom: 28px; letter-spacing: 2px; text-transform: uppercase; color: #aacc88; }
+  #hole-screen .stroke-info { font-size: 18px; opacity: 0.8; margin-bottom: 36px; }
+
+  /* Powerup screen */
+  #powerup-screen h2 { font-size: 30px; font-weight: 900; color: #aaff66; margin-bottom: 6px; }
+  #powerup-screen .pu-subtitle { opacity: 0.55; margin-bottom: 32px; letter-spacing: 1px; color: #88cc44; font-size: 13px; text-transform: uppercase; }
+  .pu-cards { display: flex; gap: 18px; flex-wrap: wrap; justify-content: center; }
+  .pu-card {
+    width: 196px; padding: 22px 18px; border-radius: 14px;
+    background: rgba(0,20,0,0.7);
+    border: 2px solid rgba(100,180,60,0.2);
+    cursor: pointer; transition: all 0.2s; text-align: center;
+  }
+  .pu-card:hover {
+    border-color: rgba(170,255,80,0.55);
+    background: rgba(0,30,0,0.85);
+    transform: translateY(-5px);
+  }
+  .pu-card .pu-icon { font-size: 46px; margin-bottom: 10px; }
+  .pu-card .pu-name { font-size: 15px; font-weight: 800; margin-bottom: 8px; color: #ccff88; }
+  .pu-card .pu-desc { font-size: 12px; opacity: 0.65; line-height: 1.5; color: #aabb88; }
+
+  .pu-card.fire   { border-color: rgba(255,107,53,0.3); }
+  .pu-card.fire:hover { box-shadow: 0 0 24px rgba(255,107,53,0.45); }
+  .pu-card.laser  { border-color: rgba(0,207,255,0.3); }
+  .pu-card.laser:hover { box-shadow: 0 0 24px rgba(0,207,255,0.45); }
+  .pu-card.power  { border-color: rgba(255,224,102,0.3); }
+  .pu-card.power:hover { box-shadow: 0 0 24px rgba(255,224,102,0.45); }
+  .pu-card.ice    { border-color: rgba(170,238,255,0.3); }
+  .pu-card.ice:hover { box-shadow: 0 0 24px rgba(170,238,255,0.45); }
+  .pu-card.ghost  { border-color: rgba(200,150,255,0.3); }
+  .pu-card.ghost:hover { box-shadow: 0 0 24px rgba(200,150,255,0.45); }
+
+  /* Game over */
+  #gameover-screen .go-title { font-size: 52px; font-weight: 900; color: #aaff66; margin-bottom: 8px; }
+  #gameover-screen .go-score { font-size: 20px; opacity: 0.8; margin-bottom: 36px; color: #ccff88; }
+  .score-table { border-collapse: collapse; margin-bottom: 32px; }
+  .score-table td, .score-table th {
+    padding: 8px 20px; text-align: center;
+    border-bottom: 1px solid rgba(100,180,60,0.15);
+  }
+  .score-table th { font-size: 10px; text-transform: uppercase; letter-spacing: 1.5px; opacity: 0.5; color: #88cc44; }
+
+  /* Controls hint */
+  #controls-hint {
+    position: fixed; bottom: 90px; left: 50%; transform: translateX(-50%);
+    font-size: 12px; color: rgba(150,220,80,0.4); pointer-events: none;
+    text-align: center; white-space: nowrap;
+  }
+
+  /* Hole banner */
+  #hole-banner {
+    position: fixed; top: 50%; left: 50%; transform: translate(-50%,-50%);
+    pointer-events: none; text-align: center; z-index: 50;
+    transition: opacity 0.5s;
+  }
+  #hole-banner.hidden { opacity: 0; }
+  #hole-banner .banner-hole { font-size: 15px; text-transform: uppercase; letter-spacing: 4px; color: rgba(150,220,80,0.7); }
+  #hole-banner .banner-num  {
+    font-size: 96px; font-weight: 900; line-height: 1;
+    background: linear-gradient(135deg, #aaff44, #44dd00);
+    -webkit-background-clip: text; -webkit-text-fill-color: transparent;
+    filter: drop-shadow(0 0 16px rgba(100,255,40,0.5));
+  }
+  #hole-banner .banner-par  { font-size: 19px; color: rgba(180,255,120,0.7); margin-top: 4px; }
+
+
+  /* Level Builder */
+  #builder-ui {
+    position: fixed; left: 0; top: 0; bottom: 0;
+    width: 170px; z-index: 200; overflow-y: auto;
+    background: rgba(0,12,0,0.92);
+    border-right: 1px solid rgba(80,160,40,0.3);
+    display: flex; flex-direction: column;
+    padding: 10px 8px;
+    scrollbar-width: thin;
+    scrollbar-color: #44882288 transparent;
+  }
+  #builder-ui.hidden { display: none; }
+  .bp-title {
+    font-size: 15px; font-weight: 900; color: #aaff66;
+    text-align: center; margin-bottom: 10px; letter-spacing: 1px;
+    text-transform: uppercase;
+  }
+  .bp-section {
+    font-size: 9px; text-transform: uppercase; letter-spacing: 2px;
+    color: #66aa44; margin: 10px 0 5px 2px;
+    border-bottom: 1px solid rgba(80,160,40,0.2);
+    padding-bottom: 3px;
+  }
+  .bp-tool {
+    display: block; width: 100%; text-align: left;
+    background: rgba(0,20,0,0.5);
+    border: 1px solid rgba(60,120,30,0.3);
+    color: #aabb88; font-size: 12px; font-weight: 600;
+    padding: 7px 10px; border-radius: 6px;
+    cursor: pointer; margin-bottom: 3px;
+    transition: background 0.15s, border-color 0.15s;
+  }
+  .bp-tool:hover { background: rgba(40,80,20,0.7); border-color: rgba(120,220,60,0.4); color: #ccff88; }
+  .bp-tool.active { background: rgba(60,120,30,0.6); border-color: #aaff66; color: #ccff88; }
+  .bp-action {
+    display: block; width: 100%;
+    background: rgba(40,80,20,0.4);
+    border: 1px solid rgba(80,160,40,0.35);
+    color: #aaff66; font-size: 12px; font-weight: 700;
+    padding: 8px 10px; border-radius: 6px;
+    cursor: pointer; margin-bottom: 4px;
+    transition: background 0.15s;
+    text-align: center;
+  }
+  .bp-action:hover { background: rgba(60,120,30,0.6); }
+  .bp-action.play { background: rgba(20,100,10,0.6); color: #66ff22; border-color: #66ff22; }
+  .bp-action.play:hover { background: rgba(40,140,20,0.7); }
+
+  /* Music controls */
+  #music-controls {
+    position: fixed; bottom: 24px; right: 18px;
+    display: flex; align-items: center; gap: 8px;
+    background: rgba(0,12,0,0.78);
+    border: 1px solid rgba(80,160,40,0.4);
+    border-radius: 40px;
+    padding: 8px 14px;
+    pointer-events: all;
+    z-index: 200;
+  }
+  #music-controls .mc-label {
+    font-size: 16px; opacity: 0.7;
+  }
+  .mc-btn {
+    background: rgba(100,200,50,0.15);
+    border: 1px solid rgba(100,200,50,0.35);
+    color: #aaff66; font-size: 13px; font-weight: 700;
+    padding: 5px 12px; border-radius: 20px; cursor: pointer;
+    transition: background 0.15s;
+    white-space: nowrap;
+  }
+  .mc-btn:hover { background: rgba(100,200,50,0.3); }
+  #music-vol {
+    width: 60px; accent-color: #66ff22; cursor: pointer;
+    vertical-align: middle;
+  }
+</style>
+</head>
+<body>
+
+<canvas id="canvas"></canvas>
+
+<!-- HUD -->
+<div id="hud">
+  <div class="hud-block">
+    <span class="hud-label">Burrow</span>
+    <span class="hud-value" id="hud-hole">1</span>
+  </div>
+  <div class="hud-block">
+    <span class="hud-label">Smacks</span>
+    <span class="hud-value" id="hud-strokes">0</span>
+  </div>
+  <div class="hud-block">
+    <span class="hud-label">Scratch</span>
+    <span class="hud-value par" id="hud-par">3</span>
+  </div>
+  <div class="hud-block">
+    <span class="hud-label">Pillage</span>
+    <span class="hud-value" id="hud-score">E</span>
+  </div>
+</div>
+
+<div id="powerup-bar"></div>
+<div id="controls-hint">Click &amp; drag near ball to aim — release to smack! &nbsp;·&nbsp; Press 1/2/3 for trinkets</div>
+
+<!-- Hole banner -->
+<div id="hole-banner" class="hidden">
+  <div class="banner-hole">👺 Burrow</div>
+  <div class="banner-num" id="banner-num">1</div>
+  <div class="banner-par" id="banner-par">Par 3</div>
+</div>
+
+
+<!-- Level Builder Panel -->
+<div id="builder-ui" class="hidden">
+  <div class="bp-title">👺 Builder</div>
+
+  <div class="bp-section">Course</div>
+  <button class="bp-tool" data-tool="draw"   onclick="game.builderSetActiveTool('draw')">✏️ Draw Tile</button>
+  <button class="bp-tool" data-tool="erase"  onclick="game.builderSetActiveTool('erase')">🗑️ Erase</button>
+
+  <div class="bp-section">Markers</div>
+  <button class="bp-tool" data-tool="tee"    onclick="game.builderSetActiveTool('tee')">🏌️ Tee</button>
+  <button class="bp-tool" data-tool="cup"    onclick="game.builderSetActiveTool('cup')">🕳️ Cup</button>
+
+  <div class="bp-section">Obstacles</div>
+  <button class="bp-tool" data-tool="stone"  onclick="game.builderSetActiveTool('stone')">🪨 Rock</button>
+  <button class="bp-tool" data-tool="wood"   onclick="game.builderSetActiveTool('wood')">🪵 Log</button>
+  <button class="bp-tool" data-tool="bumper" onclick="game.builderSetActiveTool('bumper')">🔵 Bumper</button>
+  <button class="bp-tool" data-tool="moving" onclick="game.builderSetActiveTool('moving')">⬅️ Mover</button>
+
+  <div class="bp-section">Hazards</div>
+  <button class="bp-tool" data-tool="water"  onclick="game.builderSetActiveTool('water')">💧 Water</button>
+  <button class="bp-tool" data-tool="sand"   onclick="game.builderSetActiveTool('sand')">🏖️ Sand</button>
+
+  <div class="bp-section">Actions</div>
+  <button class="bp-action play" onclick="game.playTestLevel()">▶ Play Test</button>
+  <button class="bp-action"      onclick="game.builderSave()">💾 Save</button>
+  <button class="bp-action"      onclick="game.builderLoad()">📂 Load</button>
+  <button class="bp-action"      onclick="game.builderNew()">🆕 New</button>
+  <button class="bp-action"      onclick="game.exitBuilder()">🚪 Exit</button>
+</div>
+
+<!-- Music Controls -->
+<div id="music-controls">
+  <span class="mc-label">🎵</span>
+  <button class="mc-btn" id="music-pp"    onclick="game.music.toggle()">▶</button>
+  <button class="mc-btn" id="music-track" onclick="game.music.cycleTrack()">🌅 Day</button>
+  <input  type="range" id="music-vol" min="0" max="1" step="0.05" value="0.55"
+          oninput="game.music.setVolume(+this.value)" title="Volume">
+</div>
+
+<!-- Title Screen -->
+<div id="title-screen" class="screen">
+  <div class="goblin-emoji">👺</div>
+  <h1 class="title">GOBLIN<br>GOLF</h1>
+  <div class="subtitle">Procedural · 9 Burrows · Trinkets</div>
+  <button class="btn" onclick="game.startGame(); game.music.play()">SMASH IT!</button>
+  <button class="btn secondary" onclick="game.enterBuilder()">🔨 Level Builder</button>
+  <div style="margin-top: 28px; opacity: 0.38; font-size: 12px; text-align: center; line-height: 1.9; color:#aabb88;">
+    Click &amp; drag to aim · Release to smack<br>
+    Press 1/2/3 to use trinkets<br>
+    🌅 Day / 🌙 Night tracks available
+  </div>
+</div>
+
+<!-- Hole Complete Screen -->
+<div id="hole-screen" class="screen hidden">
+  <div class="hole-title">Burrow Complete!</div>
+  <div class="hole-score" id="hole-score-val">—</div>
+  <div class="score-label" id="hole-score-label">Goblin Standard</div>
+  <div class="stroke-info" id="hole-stroke-info">3 smacks · Scratch 3</div>
+  <button class="btn" id="hole-next-btn" onclick="game.showPowerupScreen()">Grab a Trinket</button>
+</div>
+
+<!-- Powerup Selection -->
+<div id="powerup-screen" class="screen hidden">
+  <h2>👺 Grab a Trinket</h2>
+  <div class="pu-subtitle">Choose one for your belt</div>
+  <div class="pu-cards" id="pu-cards"></div>
+  <button class="btn secondary" onclick="game.skipPowerup()">Nah, leave it</button>
+</div>
+
+<!-- Game Over -->
+<div id="gameover-screen" class="screen hidden">
+  <div style="font-size:48px; margin-bottom:8px;">👺</div>
+  <div class="go-title">Raid Complete!</div>
+  <div class="go-score" id="go-summary"></div>
+  <table class="score-table" id="score-table">
+    <tr><th>Burrow</th><th>Scratch</th><th>Smacks</th><th>Pillage</th></tr>
+  </table>
+  <button class="btn" onclick="game.startGame()">Raid Again!</button>
+</div>
+
+<script src="game.js"></script>
+</body>
+</html>
