@@ -1073,6 +1073,9 @@ class Game {
     this.panLastX = 0;
     this.panLastY = 0;
     this.cameraPanOverride = false;
+    // Minimap pan
+    this._mm = null;
+    this.minimapPanDrag = false;
 
     // Level builder
     this.builderData  = null;
@@ -1117,7 +1120,7 @@ class Game {
     this.canvas.addEventListener('mouseup', e => {
       if (e.button === 1) this.panDrag = false;
     });
-    this.canvas.addEventListener('mouseleave', () => { this.panDrag = false; });
+    this.canvas.addEventListener('mouseleave', () => { this.panDrag = false; this.minimapPanDrag = false; });
 
     // ---- Scroll to zoom ----
     this.canvas.addEventListener('wheel', e => {
@@ -1139,6 +1142,14 @@ class Game {
 
     // ---- General mouse move (pan + game mouse tracking) ----
     this.canvas.addEventListener('mousemove', e => {
+      if (this.minimapPanDrag && this._mm) {
+        const sp = getPos(e);
+        const wp = this._mmToWorld(sp.x, sp.y);
+        this.camera.x = this.camera.tx = wp.x;
+        this.camera.y = this.camera.ty = wp.y;
+        this.cameraPanOverride = true;
+        return;
+      }
       if (this.panDrag) {
         const dx = e.clientX - this.panLastX;
         const dy = e.clientY - this.panLastY;
@@ -1168,6 +1179,18 @@ class Game {
     this.canvas.addEventListener('mousedown', e => {
       if (e.button !== 0) return;
       const sp = getPos(e);
+
+      // Minimap pan intercept (works in all in-game states)
+      const mmStates = ['playing', 'rolling', 'sinking', 'fanfare'];
+      if (mmStates.includes(this.state) && this._mmHit(sp.x, sp.y)) {
+        this.minimapPanDrag = true;
+        const wp = this._mmToWorld(sp.x, sp.y);
+        this.camera.x = this.camera.tx = wp.x;
+        this.camera.y = this.camera.ty = wp.y;
+        this.cameraPanOverride = true;
+        return;
+      }
+
       const wp = this.camera.toWorld(sp.x, sp.y, this.canvas);
 
       if (this.state === 'builder') {
@@ -1187,6 +1210,7 @@ class Game {
 
     this.canvas.addEventListener('mouseup', e => {
       if (e.button !== 0) return;
+      this.minimapPanDrag = false;
       if (this.state === 'builder') {
         this.builderPainting = false;
         return;
@@ -1211,6 +1235,18 @@ class Game {
     this.canvas.addEventListener('touchstart', e => {
       e.preventDefault();
       const sp = getPos(e);
+
+      // Minimap tap/drag — single touch on minimap area
+      const mmStates = ['playing', 'rolling', 'sinking', 'fanfare'];
+      if (mmStates.includes(this.state) && this._mmHit(sp.x, sp.y)) {
+        this.minimapPanDrag = true;
+        const wp = this._mmToWorld(sp.x, sp.y);
+        this.camera.x = this.camera.tx = wp.x;
+        this.camera.y = this.camera.ty = wp.y;
+        this.cameraPanOverride = true;
+        return;
+      }
+
       const wp = this.camera.toWorld(sp.x, sp.y, this.canvas);
       if (this.state === 'builder') { this.builderApplyTool(wp.x, wp.y, false); return; }
       if (this.state !== 'playing') return;
@@ -1222,12 +1258,20 @@ class Game {
     this.canvas.addEventListener('touchmove', e => {
       e.preventDefault();
       const sp = getPos(e);
+      if (this.minimapPanDrag && this._mm) {
+        const wp = this._mmToWorld(sp.x, sp.y);
+        this.camera.x = this.camera.tx = wp.x;
+        this.camera.y = this.camera.ty = wp.y;
+        this.cameraPanOverride = true;
+        return;
+      }
       const wp = this.camera.toWorld(sp.x, sp.y, this.canvas);
       this.mouse.x = wp.x; this.mouse.y = wp.y;
     }, { passive: false });
 
     this.canvas.addEventListener('touchend', e => {
       e.preventDefault();
+      this.minimapPanDrag = false;
       if (this.state !== 'playing') return;
       if (this.dragging && this.dragStart) this.shoot();
       this.dragging = false; this.dragStart = null; this.mouse.down = false;
@@ -2097,6 +2141,9 @@ class Game {
     const offX = MM_X + pad + (MM_W - pad * 2 - courseW) / 2 - bounds.x * scale;
     const offY = MM_Y + pad + (MM_H - pad * 2 - courseH) / 2 - bounds.y * scale;
 
+    // Cache geometry for event handlers
+    this._mm = { x: MM_X, y: MM_Y, w: MM_W, h: MM_H, scale, offX, offY };
+
     const toMM = (wx, wy) => ({
       x: wx * scale + offX,
       y: wy * scale + offY
@@ -2160,6 +2207,19 @@ class Game {
     ctx.strokeRect(vpP.x, vpP.y, vpW * scale, vpH * scale);
 
     ctx.restore();
+  }
+
+  // Returns true if canvas-space point (sx,sy) is inside the minimap
+  _mmHit(sx, sy) {
+    if (!this._mm) return false;
+    const m = this._mm;
+    return sx >= m.x && sx <= m.x + m.w && sy >= m.y && sy <= m.y + m.h;
+  }
+
+  // Convert canvas-space minimap point → world coords
+  _mmToWorld(sx, sy) {
+    const m = this._mm;
+    return { x: (sx - m.offX) / m.scale, y: (sy - m.offY) / m.scale };
   }
 
   hideAllScreens() {

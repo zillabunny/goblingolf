@@ -59,6 +59,7 @@
     background: rgba(0,8,0,0.88);
     color: #fff; z-index: 100;
     transition: opacity 0.4s;
+    overflow-y: auto; padding: 24px 16px;
   }
   .screen.hidden { display: none; }
 
@@ -107,7 +108,7 @@
   /* Powerup screen */
   #powerup-screen h2 { font-size: 30px; font-weight: 900; color: #aaff66; margin-bottom: 6px; }
   #powerup-screen .pu-subtitle { opacity: 0.55; margin-bottom: 32px; letter-spacing: 1px; color: #88cc44; font-size: 13px; text-transform: uppercase; }
-  .pu-cards { display: flex; gap: 18px; flex-wrap: wrap; justify-content: center; }
+  .pu-cards { display: flex; gap: 18px; flex-wrap: wrap; justify-content: center; max-height: 55vh; overflow-y: auto; }
   .pu-card {
     width: 196px; padding: 22px 18px; border-radius: 14px;
     background: rgba(0,20,0,0.7);
@@ -149,6 +150,7 @@
     position: fixed; bottom: 90px; left: 50%; transform: translateX(-50%);
     font-size: 12px; color: rgba(150,220,80,0.4); pointer-events: none;
     text-align: center; white-space: nowrap;
+    max-width: 90vw; white-space: normal;
   }
 
   /* Hole banner */
@@ -241,7 +243,44 @@
   .mc-btn:hover { background: rgba(100,200,50,0.3); }
   #music-vol {
     width: 60px; accent-color: #66ff22; cursor: pointer;
-    vertical-align: middle;
+    vertical-align: middle; touch-action: none;
+    -webkit-appearance: none; height: 20px;
+  }
+  #music-vol::-webkit-slider-thumb { -webkit-appearance: none; width: 18px; height: 18px; border-radius: 50%; background: #66ff22; cursor: pointer; }
+  #music-vol::-webkit-slider-runnable-track { height: 4px; background: rgba(100,200,50,0.3); border-radius: 2px; }
+
+  /* Goblin taunt bar on title */
+  .goblin-taunts { font-size: 13px; color: #88cc44; opacity: 0.6; margin-top: 10px; font-style: italic; text-align: center; }
+
+  /* Score table mobile scroll wrapper */
+  .score-table-wrap { max-width: 100%; overflow-x: auto; }
+
+  /* Mobile responsive */
+  @media (max-width: 500px) {
+    h1.title { font-size: 46px; }
+    .subtitle { font-size: 11px; margin-bottom: 28px; }
+    .goblin-emoji { font-size: 40px; }
+    .hud-value { font-size: 19px; }
+    .hud-label { font-size: 9px; }
+    #hud { padding: 8px 10px; }
+    .btn { padding: 12px 26px; font-size: 16px; }
+    #hole-screen .hole-title { font-size: 26px; }
+    #hole-screen .hole-score { font-size: 54px; }
+    #hole-screen .score-label { font-size: 15px; margin-bottom: 18px; }
+    #hole-screen .stroke-info { font-size: 15px; margin-bottom: 22px; }
+    #powerup-screen h2 { font-size: 24px; }
+    .pu-card { width: 140px; padding: 14px 10px; }
+    .pu-card .pu-icon { font-size: 34px; margin-bottom: 6px; }
+    .pu-card .pu-name { font-size: 13px; }
+    #gameover-screen .go-title { font-size: 38px; }
+    #gameover-screen .go-score { font-size: 16px; margin-bottom: 20px; }
+    .score-table td, .score-table th { padding: 6px 10px; font-size: 13px; }
+    #music-controls { padding: 6px 10px; gap: 5px; }
+    #music-vol { width: 44px; }
+    .mc-btn { padding: 4px 8px; font-size: 12px; }
+    #controls-hint { font-size: 11px; }
+    .pu-slot { width: 46px; height: 46px; }
+    #hole-banner .banner-num { font-size: 72px; }
   }
 </style>
 </head>
@@ -316,30 +355,33 @@
   <button class="mc-btn" id="music-pp"    onclick="game.music.toggle()">▶</button>
   <button class="mc-btn" id="music-track" onclick="game.music.cycleTrack()">🌅 Day</button>
   <input  type="range" id="music-vol" min="0" max="1" step="0.05" value="0.55"
-          oninput="game.music.setVolume(+this.value)" title="Volume">
+          oninput="game.music.setVolume(+this.value)"
+          onchange="game.music.setVolume(+this.value)" title="Volume">
 </div>
 
 <!-- Title Screen -->
 <div id="title-screen" class="screen">
-  <div class="goblin-emoji">👺</div>
+  <div class="goblin-emoji">👺🏌️👺</div>
   <h1 class="title">GOBLIN<br>GOLF</h1>
   <div class="subtitle">Procedural · 9 Burrows · Trinkets</div>
-  <button class="btn" onclick="game.startGame(); game.music.play()">SMASH IT!</button>
+  <div class="goblin-taunts" id="goblin-taunt">"The shiniest ball goes in da hole!"</div>
+  <button class="btn" style="margin-top:28px" onclick="game.startGame(); game.music.play()">SMASH IT! 👺</button>
   <button class="btn secondary" onclick="game.enterBuilder()">🔨 Level Builder</button>
-  <div style="margin-top: 28px; opacity: 0.38; font-size: 12px; text-align: center; line-height: 1.9; color:#aabb88;">
-    Click &amp; drag to aim · Release to smack<br>
-    Press 1/2/3 to use trinkets<br>
-    🌅 Day / 🌙 Night tracks available
+  <div style="margin-top: 24px; opacity: 0.38; font-size: 12px; text-align: center; line-height: 1.9; color:#aabb88;">
+    Drag near ball to aim · Release to smack<br>
+    Tap minimap to pan · 1/2/3 for trinkets<br>
+    🌅 Day / 🌙 Night goblin tracks
   </div>
 </div>
 
 <!-- Hole Complete Screen -->
 <div id="hole-screen" class="screen hidden">
+  <div style="font-size:32px; margin-bottom:4px;">👺⛳👺</div>
   <div class="hole-title">Burrow Complete!</div>
   <div class="hole-score" id="hole-score-val">—</div>
   <div class="score-label" id="hole-score-label">Goblin Standard</div>
   <div class="stroke-info" id="hole-stroke-info">3 smacks · Scratch 3</div>
-  <button class="btn" id="hole-next-btn" onclick="game.showPowerupScreen()">Grab a Trinket</button>
+  <button class="btn" id="hole-next-btn" onclick="game.showPowerupScreen()">👜 Grab a Trinket</button>
 </div>
 
 <!-- Powerup Selection -->
@@ -352,15 +394,35 @@
 
 <!-- Game Over -->
 <div id="gameover-screen" class="screen hidden">
-  <div style="font-size:48px; margin-bottom:8px;">👺</div>
+  <div style="font-size:48px; margin-bottom:8px;">👺🏆👺</div>
   <div class="go-title">Raid Complete!</div>
   <div class="go-score" id="go-summary"></div>
-  <table class="score-table" id="score-table">
-    <tr><th>Burrow</th><th>Scratch</th><th>Smacks</th><th>Pillage</th></tr>
-  </table>
-  <button class="btn" onclick="game.startGame()">Raid Again!</button>
+  <div class="score-table-wrap">
+    <table class="score-table" id="score-table">
+      <tr><th>Burrow</th><th>Scratch</th><th>Smacks</th><th>Pillage</th></tr>
+    </table>
+  </div>
+  <button class="btn" onclick="game.startGame()">👺 Raid Again!</button>
 </div>
 
-<script src="game.js?v=3"></script>
+<script>
+  // Rotating goblin taunts on title screen
+  const _taunts = [
+    '"Da shiniest ball goes in da hole!"',
+    '"Smash it gud, smash it FAR!"',
+    '"Goblins don\'t miss... much."',
+    '"Why walk when you can BONK?"',
+    '"Par is just a goblin suggestion."',
+    '"Trinkets make everything better!"',
+    '"Dis course belongs to us now!"',
+    '"Hit hard, ask questions later."',
+  ];
+  let _tIdx = 0;
+  setInterval(() => {
+    const el = document.getElementById('goblin-taunt');
+    if (el) { _tIdx = (_tIdx + 1) % _taunts.length; el.textContent = _taunts[_tIdx]; }
+  }, 3500);
+</script>
+<script src="game.js?v=4"></script>
 </body>
 </html>
