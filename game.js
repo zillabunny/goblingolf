@@ -1095,6 +1095,39 @@ class Game {
 
     this.music = new MusicSystem();
 
+    // ---- Ads ----
+    this._adIdx = 0;        // cycles through goblin ads
+    this._adBannerIdx = 0;  // separate cycle for banner
+    this._adsEl = {
+      banner:      document.getElementById('ad-banner'),
+      bannerIcon:  document.getElementById('ad-banner-icon'),
+      bannerHead:  document.getElementById('ad-banner-headline'),
+      bannerTag:   document.getElementById('ad-banner-tagline'),
+      bannerCta:   document.getElementById('ad-banner-cta'),
+      intEl:       document.getElementById('ad-interstitial'),
+      intIcon:     document.getElementById('ad-int-icon'),
+      intProduct:  document.getElementById('ad-int-product'),
+      intTagline:  document.getElementById('ad-int-tagline'),
+      intCta:      document.getElementById('ad-int-cta'),
+      intTimer:    document.getElementById('ad-int-timer'),
+      skipBtn:     document.getElementById('ad-skip-btn'),
+    };
+    this._ADS = [
+      { icon:'🗡️', product:'GOBLIN SPEARS EMPORIUM',  tagline:'"Pointy end goes in enemy!"',      cta:'LOOT NOW'     },
+      { icon:'💎', product:'SHINY ROCK EXCHANGE',      tagline:'"We buy shinies for cheap gold!"', cta:'SELL TODAY'   },
+      { icon:'🔥', product:"TORCHES 'R' US",           tagline:'"Cave too dark? NOT ANYMORE!"',    cta:'LIGHT IT UP'  },
+      { icon:'⛏️', product:'GOBLIN SHOVELS INC.',      tagline:'"Dig where you're not supposed!"',cta:'DIG NOW'      },
+      { icon:'🛡️', product:'TROLL BRIDGE INSURANCE',   tagline:'"Can't pay the toll? We got you!"',cta:'GET COVERED' },
+      { icon:'🍄', product:'CAVE MUSHROOMS MARKET',    tagline:'"Fresh. Edible. Probably."',        cta:'EAT NOW'      },
+      { icon:'🪄', product:'WITCH POTIONS CO.',        tagline:'"Turn enemies into frogs!"',        cta:'BREW NOW'     },
+      { icon:'🏚️', product:'CAVE REAL ESTATE',        tagline:'"Premium caves. Rats included."',   cta:'MOVE IN'      },
+    ];
+    // Rotate banner ad every 8 seconds during gameplay
+    setInterval(() => {
+      this._adBannerIdx = (this._adBannerIdx + 1) % this._ADS.length;
+      this._updateBannerAd(this._adBannerIdx);
+    }, 8000);
+
     // Sound effects
     this.sfx = {
       swing:   new Audio('swing.mp3'),
@@ -1114,6 +1147,62 @@ class Game {
   resize() {
     this.canvas.width  = window.innerWidth;
     this.canvas.height = window.innerHeight;
+  }
+
+  // ---- Ad helpers ----
+  _updateBannerAd(idx) {
+    const ad = this._ADS[idx];
+    if (!ad) return;
+    this._adsEl.bannerIcon.textContent = ad.icon;
+    this._adsEl.bannerHead.textContent = ad.product;
+    this._adsEl.bannerTag.textContent  = ad.tagline;
+    this._adsEl.bannerCta.textContent  = ad.cta;
+  }
+
+  showAdBanner() {
+    this._updateBannerAd(this._adBannerIdx);
+    this._adsEl.banner.classList.remove('hidden');
+  }
+
+  hideAdBanner() {
+    this._adsEl.banner.classList.add('hidden');
+  }
+
+  // Show an interstitial ad then call cb when dismissed.
+  // Every 3 holes a full-screen ad appears; other holes skip straight to cb.
+  maybeShowInterstitial(cb) {
+    if (this.holeNum % 3 !== 0) { cb(); return; }
+
+    const ad = this._ADS[this._adIdx % this._ADS.length];
+    this._adIdx++;
+    const els = this._adsEl;
+
+    els.intIcon.textContent    = ad.icon;
+    els.intProduct.textContent = ad.product;
+    els.intTagline.textContent = ad.tagline;
+    els.intCta.textContent     = ad.cta;
+    els.skipBtn.style.display  = 'none';
+    els.intEl.classList.remove('hidden');
+    this.hideAdBanner();
+
+    let secs = 5;
+    els.intTimer.textContent = `Ad closes in ${secs}s`;
+
+    const dismiss = () => {
+      clearInterval(ticker);
+      els.intEl.classList.add('hidden');
+      cb();
+    };
+
+    const ticker = setInterval(() => {
+      secs--;
+      els.intTimer.textContent = secs > 0 ? `Ad closes in ${secs}s` : 'Closing…';
+      if (secs === 3) els.skipBtn.style.display = 'block';
+      if (secs <= 0)  dismiss();
+    }, 1000);
+
+    els.skipBtn.onclick = dismiss;
+    els.intCta.onclick  = dismiss; // tapping the CTA also dismisses (placeholder behaviour)
   }
 
   bindEvents() {
@@ -1361,6 +1450,7 @@ class Game {
 
     // Show banner
     this.state = 'overview';
+    this.showAdBanner();
     this.overviewTimer = 160;
     this.bannerTimer   = 140;
     this.showBanner(num, this.level.par);
@@ -1943,6 +2033,7 @@ class Game {
   }
 
   holeComplete() {
+    this.hideAdBanner();
     const strokes  = this.strokes;
     const par      = this.level.par;
     const diff     = strokes - par;
@@ -1985,10 +2076,10 @@ class Game {
       nextBtn.onclick = () => this.returnToBuilder();
     } else if (this.holeNum >= TOTAL_HOLES) {
       nextBtn.textContent = 'Count the Loot';
-      nextBtn.onclick = () => this.showGameOver();
+      nextBtn.onclick = () => this.maybeShowInterstitial(() => this.showGameOver());
     } else {
       nextBtn.textContent = 'Grab a Trinket';
-      nextBtn.onclick = () => this.showPowerupScreen();
+      nextBtn.onclick = () => this.maybeShowInterstitial(() => this.showPowerupScreen());
     }
 
     this.state = 'hole_complete';
@@ -1996,6 +2087,7 @@ class Game {
   }
 
   showPowerupScreen() {
+    this.hideAdBanner();
     this.hideAllScreens();
     const screen = document.getElementById('powerup-screen');
     screen.classList.remove('hidden');
@@ -2031,6 +2123,7 @@ class Game {
   }
 
   showGameOver() {
+    this.hideAdBanner();
     this.hideAllScreens();
     const screen = document.getElementById('gameover-screen');
     screen.classList.remove('hidden');

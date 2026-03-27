@@ -30,7 +30,7 @@
 
   /* Powerup bar */
   #powerup-bar {
-    position: fixed; bottom: 24px; left: 50%; transform: translateX(-50%);
+    position: fixed; bottom: 76px; left: 50%; transform: translateX(-50%);
     display: flex; gap: 10px;
   }
   .pu-slot { pointer-events: auto; cursor: pointer; }
@@ -279,6 +279,93 @@
     .pu-slot { width: 46px; height: 46px; }
     #hole-banner .banner-num { font-size: 72px; }
   }
+
+  /* ---- Ad Banner (bottom, in-game) ---- */
+  #ad-banner {
+    position: fixed; bottom: 0; left: 0; right: 0;
+    height: 56px;
+    background: rgba(4,16,2,0.93);
+    border-top: 1px solid rgba(100,200,50,0.25);
+    display: flex; align-items: center;
+    padding: 0 12px; gap: 10px;
+    z-index: 150; pointer-events: none;
+    transition: opacity 0.3s;
+  }
+  #ad-banner.hidden { opacity: 0; pointer-events: none; }
+  .ad-badge {
+    font-size: 9px; font-weight: 900; letter-spacing: 1px;
+    color: #556644; background: rgba(100,200,50,0.12);
+    border: 1px solid rgba(100,200,50,0.25);
+    border-radius: 3px; padding: 1px 4px; flex-shrink: 0;
+  }
+  .ad-banner-icon { font-size: 24px; flex-shrink: 0; }
+  .ad-banner-text { flex: 1; min-width: 0; }
+  .ad-banner-headline {
+    font-size: 12px; font-weight: 800; color: #cceebb;
+    white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+  }
+  .ad-banner-tagline {
+    font-size: 10px; color: #88aa66; opacity: 0.8;
+    white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+  }
+  .ad-banner-cta {
+    font-size: 11px; font-weight: 800; color: #0a1a00;
+    background: linear-gradient(135deg, #88ee22, #55cc00);
+    border: none; border-radius: 14px; padding: 5px 12px;
+    cursor: pointer; flex-shrink: 0; white-space: nowrap;
+    pointer-events: all;
+  }
+
+  /* ---- Ad Interstitial (between holes) ---- */
+  #ad-interstitial {
+    position: fixed; inset: 0; z-index: 400;
+    background: rgba(0,6,0,0.95);
+    display: flex; flex-direction: column;
+    align-items: center; justify-content: center;
+    padding: 20px 16px;
+  }
+  #ad-interstitial.hidden { display: none; }
+  .ad-int-label {
+    font-size: 10px; letter-spacing: 2px; color: #556644;
+    text-transform: uppercase; margin-bottom: 16px;
+  }
+  .ad-int-card {
+    background: rgba(10,30,6,0.9);
+    border: 1px solid rgba(100,200,50,0.3);
+    border-radius: 18px; padding: 32px 24px;
+    max-width: 380px; width: 100%;
+    display: flex; flex-direction: column; align-items: center;
+    text-align: center; gap: 10px;
+  }
+  .ad-int-icon { font-size: 64px; line-height: 1; }
+  .ad-int-product {
+    font-size: 22px; font-weight: 900; color: #cceebb;
+    letter-spacing: 0.5px;
+  }
+  .ad-int-tagline { font-size: 14px; color: #88bb66; opacity: 0.85; }
+  .ad-int-cta {
+    margin-top: 8px;
+    padding: 13px 36px; font-size: 16px; font-weight: 800;
+    border: none; border-radius: 40px; cursor: pointer;
+    background: linear-gradient(135deg, #66ff22, #33cc00);
+    color: #0a1a00; letter-spacing: 0.5px;
+    box-shadow: 0 4px 20px rgba(80,220,20,0.35);
+  }
+  .ad-int-timer {
+    font-size: 12px; color: #556644; margin-top: 12px;
+  }
+  #ad-skip-btn {
+    margin-top: 8px; background: none; border: 1px solid rgba(100,180,50,0.3);
+    color: #88aa66; font-size: 12px; border-radius: 20px;
+    padding: 6px 18px; cursor: pointer;
+  }
+  #ad-skip-btn:hover { background: rgba(100,180,50,0.1); }
+  @media (max-width: 500px) {
+    .ad-int-icon { font-size: 48px; }
+    .ad-int-product { font-size: 18px; }
+    .ad-int-tagline { font-size: 13px; }
+    .ad-banner-cta { display: none; }
+  }
 </style>
 </head>
 <body>
@@ -402,6 +489,31 @@
   <button class="btn" onclick="game.startGame()">👺 Raid Again!</button>
 </div>
 
+
+<!-- In-game bottom banner ad -->
+<div id="ad-banner" class="hidden">
+  <span class="ad-badge">AD</span>
+  <span class="ad-banner-icon" id="ad-banner-icon">🗡️</span>
+  <div class="ad-banner-text">
+    <div class="ad-banner-headline" id="ad-banner-headline">GOBLIN SPEARS EMPORIUM</div>
+    <div class="ad-banner-tagline" id="ad-banner-tagline">"Pointy end goes in enemy!"</div>
+  </div>
+  <button class="ad-banner-cta" id="ad-banner-cta">LOOT NOW</button>
+</div>
+
+<!-- Between-hole interstitial ad -->
+<div id="ad-interstitial" class="hidden">
+  <div class="ad-int-label">Advertisement</div>
+  <div class="ad-int-card">
+    <div class="ad-int-icon" id="ad-int-icon">🗡️</div>
+    <div class="ad-int-product" id="ad-int-product">GOBLIN SPEARS EMPORIUM</div>
+    <div class="ad-int-tagline" id="ad-int-tagline">"Pointy end goes in enemy!"</div>
+    <button class="ad-int-cta" id="ad-int-cta">LOOT NOW</button>
+    <div class="ad-int-timer" id="ad-int-timer">Ad closes in 5s</div>
+    <button id="ad-skip-btn" style="display:none">Skip Ad ›</button>
+  </div>
+</div>
+
 <script>
   // Rotating goblin taunts on title screen
   const _taunts = [
@@ -420,6 +532,6 @@
     if (el) { _tIdx = (_tIdx + 1) % _taunts.length; el.textContent = _taunts[_tIdx]; }
   }, 3500);
 </script>
-<script src="game.js?v=9"></script>
+<script src="game.js?v=10"></script>
 </body>
 </html>
