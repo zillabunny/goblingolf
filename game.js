@@ -1838,12 +1838,16 @@ class Game {
     ctx.save();
     ctx.translate(sx, sy);
 
-    // Main text
+    // Main text — scale down to fit narrow screens
     const scale = f.tier === 'hio' ? 1 + Math.sin(Date.now() * 0.008) * 0.08 : 1;
     const fontSize = f.tier === 'hio' ? 68 : f.tier === 'eagle' ? 54 : 44;
-    ctx.font = `900 ${fontSize * scale}px sans-serif`;
     ctx.textAlign = 'center';
     ctx.textBaseline = 'middle';
+    ctx.font = `900 ${fontSize * scale}px sans-serif`;
+    const maxTextW = W * 0.88;
+    const measuredW = ctx.measureText(f.text).width;
+    const fitScale = measuredW > maxTextW ? maxTextW / measuredW : 1;
+    ctx.font = `900 ${fontSize * scale * fitScale}px sans-serif`;
 
     // Rainbow text for hio
     if (f.tier === 'hio') {
