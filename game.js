@@ -38,7 +38,8 @@ function shuffle(arr) {
   return a;
 }
 
-// Closest point on segment (x1,y1)-(x2,y2) to point (px,py)
+// Closest point on segment (x1,y1)-(x2,y2) to point (px,py).
+// Uses scalar projection: t = dot(p-a, b-a) / |b-a|², clamped to [0,1].
 function closestOnSeg(px, py, x1, y1, x2, y2) {
   const dx = x2-x1, dy = y2-y1;
   const lenSq = dx*dx + dy*dy;
@@ -103,14 +104,15 @@ function generateLevel(holeNum) {
     hazard: null  // 'water' | 'sand' | null
   }));
 
-  // Wall segments (outer boundary of connected cells)
+  // Wall segments: for each cell, emit a segment on any side that has no neighbour.
+  // This produces the full outer boundary of the course without duplicates.
   const walls = [];
   for (const p of path) {
     const wx = p.gx * CELL, wy = p.gy * CELL;
-    if (!cellSet.has(`${p.gx-1},${p.gy}`)) walls.push({ x1:wx,      y1:wy,       x2:wx,      y2:wy+CELL });
-    if (!cellSet.has(`${p.gx+1},${p.gy}`)) walls.push({ x1:wx+CELL, y1:wy,       x2:wx+CELL, y2:wy+CELL });
-    if (!cellSet.has(`${p.gx},${p.gy-1}`)) walls.push({ x1:wx,      y1:wy,       x2:wx+CELL, y2:wy       });
-    if (!cellSet.has(`${p.gx},${p.gy+1}`)) walls.push({ x1:wx,      y1:wy+CELL,  x2:wx+CELL, y2:wy+CELL });
+    if (!cellSet.has(`${p.gx-1},${p.gy}`)) walls.push({ x1:wx,      y1:wy,       x2:wx,      y2:wy+CELL }); // left edge
+    if (!cellSet.has(`${p.gx+1},${p.gy}`)) walls.push({ x1:wx+CELL, y1:wy,       x2:wx+CELL, y2:wy+CELL }); // right edge
+    if (!cellSet.has(`${p.gx},${p.gy-1}`)) walls.push({ x1:wx,      y1:wy,       x2:wx+CELL, y2:wy       }); // top edge
+    if (!cellSet.has(`${p.gx},${p.gy+1}`)) walls.push({ x1:wx,      y1:wy+CELL,  x2:wx+CELL, y2:wy+CELL }); // bottom edge
   }
 
   const tee = { x: cells[0].x + CELL/2, y: cells[0].y + CELL/2 };
@@ -331,6 +333,7 @@ class Camera {
     this.zoom = lerp(this.zoom, this.tz, 0.05);
   }
 
+  // World → screen: shift by camera position, scale by zoom, re-center on canvas.
   toScreen(wx, wy, canvas) {
     return {
       x: (wx - this.x) * this.zoom + canvas.width  / 2,
@@ -338,6 +341,7 @@ class Camera {
     };
   }
 
+  // Screen → world: exact inverse of toScreen.
   toWorld(sx, sy, canvas) {
     return {
       x: (sx - canvas.width  / 2) / this.zoom + this.x,
@@ -345,6 +349,8 @@ class Camera {
     };
   }
 
+  // ctx transform equivalent — NOT used in render() because all draw methods call
+  // toScreen() themselves. Using both simultaneously would double-transform everything.
   apply(ctx, canvas) {
     ctx.translate(canvas.width / 2, canvas.height / 2);
     ctx.scale(this.zoom, this.zoom);
@@ -424,7 +430,7 @@ function resolveRect(ball, obs) {
     }
     return true;
   } else if (d === 0) {
-    // Ball center is inside rect — push out shortest axis
+    // Ball center is inside rect (tunnelled in) — push out along shortest overlap axis
     const overlapLeft  = ball.x - x;
     const overlapRight = (x+w) - ball.x;
     const overlapTop   = ball.y - y;
@@ -456,6 +462,8 @@ function getCellAt(x, y, cells) {
 // ============================================================
 //  POWERUP DEFINITIONS
 // ============================================================
+// 'power' is passive/permanent (always active, no key binding).
+// All others are consumable — activated per-shot via keys 1/2/3.
 const POWERUP_DEFS = {
   power: {
     id: 'power', name: 'Goblin Rage',
@@ -1366,6 +1374,7 @@ class Game {
     const d  = Math.sqrt(dx*dx + dy*dy);
     if (d < 3 / this.camera.zoom) return;
 
+    // Reset sticky pan so camera follows the ball again on next roll.
     this.cameraPanOverride = false;
 
     const maxPow = BASE_POWER * this.powerMult;
@@ -1405,6 +1414,8 @@ class Game {
     const slot = this.powerupInventory[id];
     if (!slot || slot.uses <= 0) return;
 
+    // Ice is an immediate, non-shot effect — applied right now regardless of state.
+    // fire/laser/ghost are queued as activeEffect and consume one use when the shot lands.
     if (id === 'ice') {
       // Ice freezes moving obstacles AND water tiles for 5 seconds (300 frames)
       this.frozenTimer = 300;
@@ -1484,7 +1495,8 @@ class Game {
       div.onclick = () => {}; // passive — clicking does nothing
       bar.appendChild(div);
     });
-    // Render active (non-passive) slots with sequential key numbers
+    // Active (consumable) slots numbered 1/2/3 — 'power' is excluded because it
+    // is passive and has no key binding. The slot index here must match activatePowerupSlot().
     const activeKeys = allKeys.filter(id => id !== 'power');
     activeKeys.forEach((id, i) => {
       const slot = this.powerupInventory[id];
@@ -1529,7 +1541,7 @@ class Game {
       }
     }
 
-    // Determine current friction
+    // Determine friction coefficient for the cell the ball is currently on.
     const cell = getCellAt(ball.x, ball.y, level.cells);
     const fr   = cell?.hazard === 'sand' ? FRICTION_SAND
                : cell?.frozenWater      ? 0.998        // icy — very slippery
@@ -1539,7 +1551,8 @@ class Game {
     const isGhost = this.activeEffect === 'ghost';
     const skipObstacles = isLaser || isGhost;
 
-    // Advance moving obstacles once per frame (outside substep loop)
+    // Advance moving obstacles ONCE per frame, outside the substep loop.
+    // If updated inside the loop they would move SUBSTEPS times faster than intended.
     if (!skipObstacles) {
       for (const obs of level.obstacles) {
         if (!obs.alive || obs.type !== 'moving' || this.frozenTimer > 0) continue;
@@ -1553,7 +1566,9 @@ class Game {
       }
     }
 
-    // Sub-stepped physics
+    // Sub-stepped physics: split each frame into SUBSTEPS micro-steps to prevent
+    // tunnelling at high speed. Friction is distributed as pow(fr,1/N) per step
+    // so that applying it N times equals one full-frame application of fr.
     for (let step = 0; step < SUBSTEPS; step++) {
       ball.vx *= Math.pow(fr, 1/SUBSTEPS);
       ball.vy *= Math.pow(fr, 1/SUBSTEPS);
@@ -1684,7 +1699,8 @@ class Game {
       }
     }
 
-    // Cup pull & hole detection
+    // Cup pull: nudge the ball toward the hole when it's close and slow,
+    // so near-misses feel satisfying without being unfair at high speed.
     const dc = dist(ball.x, ball.y, level.cup.x, level.cup.y);
     const spd = Math.sqrt(ball.vx*ball.vx + ball.vy*ball.vy);
     if (dc < CUP_PULL_R && spd < BASE_POWER * this.powerMult * 0.55) {
@@ -2021,6 +2037,8 @@ class Game {
 
   // ---- Camera ----
   updateCamera() {
+    // Only auto-follow when the player hasn't manually panned.
+    // cameraPanOverride stays true until the next shot, keeping the view sticky.
     if ((this.state === 'rolling' || this.state === 'playing') && !this.cameraPanOverride) {
       this.camera.setTarget(this.ball.x, this.ball.y, this.camera.tz);
     }
@@ -2052,7 +2070,8 @@ class Game {
 
     if (!this.level) return;
 
-    // All renderer methods use camera.toScreen() internally — no ctx transform needed
+    // IMPORTANT: all draw methods call camera.toScreen() for coordinate conversion.
+    // Never call camera.apply(ctx) here — mixing both causes a double-transform bug.
     this.renderer.drawCells(this.level.cells);
     this.renderer.drawWalls(this.level.walls);
     this.renderer.drawObstacles(this.level.obstacles);
@@ -2085,7 +2104,9 @@ class Game {
         this.renderer.drawBall(this.ball, pwEffects);
         ctx.restore();
       } else if (this.rampElevation > 0.01) {
-        // Ramp-over elevation effect: ball rises toward camera
+        // Ramp-over effect: sin(t*PI) gives 0→1→0 arc across the bridge.
+        // Ball is translated upward in screen space and scaled up to simulate
+        // rising toward the camera. Shadow stays at ground level.
         const elev = this.rampElevation;
         const s = this.camera.toScreen(this.ball.x, this.ball.y, this.canvas);
         const lift = elev * 28 * this.camera.zoom;   // screen-space upward offset
@@ -2133,7 +2154,7 @@ class Game {
     const cells = this.level.cells;
     const bounds = this.level.bounds;
 
-    // Compute scale to fit entire course into minimap with padding
+    // Compute uniform scale so the entire course fits inside the minimap with padding.
     const pad = 6;
     const scaleX = (MM_W - pad * 2) / (bounds.w || 1);
     const scaleY = (MM_H - pad * 2) / (bounds.h || 1);
@@ -2148,6 +2169,7 @@ class Game {
     // Cache geometry for event handlers
     this._mm = { x: MM_X, y: MM_Y, w: MM_W, h: MM_H, scale, offX, offY };
 
+    // toMM is world→minimap; _mmToWorld is the inverse (see below).
     const toMM = (wx, wy) => ({
       x: wx * scale + offX,
       y: wy * scale + offY
@@ -2574,6 +2596,9 @@ class Game {
   }
 
   // ---- Main loop ----
+  // Update order matters: physics before hazard (hazard reads ball pos after physics),
+  // fanfare after hazard (fanfare is triggered by sinkBall which runs in physics),
+  // camera last so it sees the final ball position for this frame.
   loop() {
     this.updateOverview();
     this.updateMovingObstacles();
