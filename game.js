@@ -1098,12 +1098,11 @@ class Game {
     // Sound effects
     this.sfx = {
       swing:   new Audio('swing.mp3'),
+      hole:    new Audio('hit-the-hole.mp3'),
       fanfare: new Audio('goblin fanfair.mp3'),
-      // Pool of 6 tap sounds so rapid-fire taps can overlap
-      holeTaps: Array.from({length: 6}, () => { const a = new Audio('hit-the-hole.mp3'); a.volume = 0.6; return a; }),
-      _tapIdx: 0,
     };
     this.sfx.swing.volume = 0.7;
+    this.sfx.hole.volume  = 0.7;
     this.sfx.fanfare.volume = 0.7;
 
     this.resize();
@@ -1741,22 +1740,14 @@ class Game {
     }
   }
 
-  _playTap() {
-    const tap = this.sfx.holeTaps[this.sfx._tapIdx % this.sfx.holeTaps.length];
-    this.sfx._tapIdx++;
-    tap.currentTime = 0;
-    tap.play().catch(() => {});
-  }
-
   sinkBall() {
     this.state = 'sinking';
     this.ball.vx = 0; this.ball.vy = 0;
     this.consumeActiveEffect();
-    this._prevCupDist = Infinity;
 
-    // Schedule tap sounds at irregular intervals to simulate rim rattling
-    const tapTimes = [0, 80, 180, 300, 430];
-    tapTimes.forEach(ms => setTimeout(() => { if (this.state === 'sinking') this._playTap(); }, ms));
+    // Ball touches the hole
+    this.sfx.hole.currentTime = 0;
+    this.sfx.hole.play().catch(() => {});
 
     let t = 0;
     const interval = setInterval(() => {
