@@ -1094,6 +1094,15 @@ class Game {
     this.isPlayTest   = false;
 
     this.music = new MusicSystem();
+
+    // Sound effects
+    this.sfx = {
+      swing:   new Audio('swing.mp3'),
+      hole:    new Audio('hit-the-hole.mp3'),
+      fanfare: new Audio('goblin fanfair.mp3'),
+    };
+    for (const s of Object.values(this.sfx)) s.volume = 0.7;
+
     this.resize();
     this.bindEvents();
     this.loop();
@@ -1386,6 +1395,10 @@ class Game {
     this.ball.rolling = true;
     this.strokes++;
     this.state = 'rolling';
+
+    // Swing sound
+    this.sfx.swing.currentTime = 0;
+    this.sfx.swing.play().catch(() => {});
 
     // Active powerup effect (fire/laser/ghost) stays active until ball stops;
     // ice is handled immediately in activatePowerupSlot and never queued here.
@@ -1729,6 +1742,10 @@ class Game {
     this.state = 'sinking';
     this.ball.vx = 0; this.ball.vy = 0;
     this.consumeActiveEffect();
+
+    // Ball touches the hole
+    this.sfx.hole.currentTime = 0;
+    this.sfx.hole.play().catch(() => {});
     let t = 0;
     const interval = setInterval(() => {
       t++;
@@ -1749,6 +1766,10 @@ class Game {
   }
 
   triggerFanfare() {
+    // Goblin fanfare — ball is fully in the hole
+    this.sfx.fanfare.currentTime = 0;
+    this.sfx.fanfare.play().catch(() => {});
+
     const diff  = this.strokes - this.level.par;
     const isHio = this.strokes === 1;
 
