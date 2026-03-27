@@ -1119,6 +1119,17 @@ class Game {
   bindEvents() {
     window.addEventListener('resize', () => this.resize());
 
+    // iOS Safari blocks audio elements from playing unless they have been
+    // triggered at least once from within a user-gesture handler. Pre-unlock
+    // hole and fanfare on the very first touch/click so they can fire later
+    // from the physics loop and setInterval without being blocked.
+    const unlockSfx = () => {
+      [this.sfx.hole, this.sfx.fanfare].forEach(snd => {
+        snd.play().then(() => { snd.pause(); snd.currentTime = 0; }).catch(() => {});
+      });
+    };
+    document.addEventListener('pointerdown', unlockSfx, { once: true });
+
     const getPos = e => {
       const rect = this.canvas.getBoundingClientRect();
       if (e.touches) {
