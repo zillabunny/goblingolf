@@ -1106,10 +1106,6 @@ class Game {
     this.sfx.swing.volume = 0.7;
     this.sfx.fanfare.volume = 0.7;
 
-    // Rim-tap state: track previous cup distance + cooldown
-    this._prevCupDist = Infinity;
-    this._tapCooldown = 0;
-
     this.resize();
     this.bindEvents();
     this.loop();
@@ -1734,17 +1730,6 @@ class Game {
       return;
     }
 
-    // Rim-tap sound: ball was approaching cup and just started moving away = bounce off rim
-    if (this._tapCooldown > 0) this._tapCooldown--;
-    if (dc < CUP_PULL_R && dc > this._prevCupDist && this._tapCooldown === 0) {
-      const tap = this.sfx.holeTaps[this.sfx._tapIdx % this.sfx.holeTaps.length];
-      this.sfx._tapIdx++;
-      tap.currentTime = 0;
-      tap.play().catch(() => {});
-      this._tapCooldown = 4; // ~4 substeps between taps so rapid bounces don't stack
-    }
-    this._prevCupDist = dc < CUP_PULL_R ? dc : Infinity;
-
     // Ball stopped
     if (spd < STOP_SPEED) {
       ball.vx = 0; ball.vy = 0;
@@ -1756,11 +1741,23 @@ class Game {
     }
   }
 
+  _playTap() {
+    const tap = this.sfx.holeTaps[this.sfx._tapIdx % this.sfx.holeTaps.length];
+    this.sfx._tapIdx++;
+    tap.currentTime = 0;
+    tap.play().catch(() => {});
+  }
+
   sinkBall() {
     this.state = 'sinking';
     this.ball.vx = 0; this.ball.vy = 0;
     this.consumeActiveEffect();
-    this._prevCupDist = Infinity; // reset tap tracker
+    this._prevCupDist = Infinity;
+
+    // Schedule tap sounds at irregular intervals to simulate rim rattling
+    const tapTimes = [0, 80, 180, 300, 430];
+    tapTimes.forEach(ms => setTimeout(() => { if (this.state === 'sinking') this._playTap(); }, ms));
+
     let t = 0;
     const interval = setInterval(() => {
       t++;
