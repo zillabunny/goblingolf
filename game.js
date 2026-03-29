@@ -499,10 +499,17 @@ const POWERUP_DEFS = {
     desc: 'Magic mushroom makes ball phase through everything!',
     persistent: false, uses: 2,
     key: '2'
+  },
+  blackhole: {
+    id: 'blackhole', name: 'Black Hole',
+    icon: '🕳️', cssClass: 'blackhole',
+    desc: "Rip open a void — swallows the ball instantly. That stroke doesn't count.",
+    persistent: false, uses: 1,
+    key: '4'
   }
 };
 
-const POWERUP_POOL = ['power', 'fire', 'laser', 'ice', 'ghost'];
+const POWERUP_POOL = ['power', 'fire', 'laser', 'ice', 'ghost', 'blackhole'];
 
 // ============================================================
 //  RENDERER
@@ -849,6 +856,26 @@ class Renderer {
     ctx.fillRect(s.x + tw * 0.1, ty - fr * 0.18, tw, fr * 0.2);
   }
 
+  drawGoblinAtTee(tee, img) {
+    if (!img || !img.complete || img.naturalWidth === 0) return;
+    const ctx = this.ctx;
+    const s = this.camera.toScreen(tee.x, tee.y, this.canvas);
+    const zoom = this.camera.zoom;
+    const h = 72 * zoom;
+    const w = h * (img.naturalWidth / img.naturalHeight);
+    // Position goblin so its feet sit near the tee center, offset left so club swings toward ball
+    const dx = -w * 0.35;
+    const dy = -h * 0.92;
+    ctx.save();
+    // Drop shadow for depth
+    ctx.shadowColor = 'rgba(0,0,0,0.55)';
+    ctx.shadowBlur  = 8 * zoom;
+    ctx.shadowOffsetX = 2 * zoom;
+    ctx.shadowOffsetY = 3 * zoom;
+    ctx.drawImage(img, s.x + dx, s.y + dy, w, h);
+    ctx.restore();
+  }
+
   drawBall(ball, powerups = {}) {
     const ctx = this.ctx;
     const s = this.camera.toScreen(ball.x, ball.y, this.canvas);
@@ -967,6 +994,37 @@ class Renderer {
     const r2 = r * 0.5;
     ctx.beginPath(); ctx.arc(s.x, s.y, r2, 0, Math.PI*2); ctx.stroke();
   }
+
+  drawBlackHoleVortex(wx, wy, t) {
+    const ctx = this.ctx;
+    const s = this.camera.toScreen(wx, wy, this.canvas);
+    const zoom = this.camera.zoom;
+    const maxR = 36 * zoom;
+    const r = maxR * (1 - t * 0.5);
+
+    // Dark radial gradient — the void
+    const g = ctx.createRadialGradient(s.x, s.y, 0, s.x, s.y, r);
+    g.addColorStop(0,   'rgba(0,0,0,0.98)');
+    g.addColorStop(0.35,'rgba(60,0,120,0.80)');
+    g.addColorStop(0.65,'rgba(120,0,200,0.40)');
+    g.addColorStop(1,   'rgba(0,0,0,0)');
+    ctx.beginPath();
+    ctx.arc(s.x, s.y, r, 0, Math.PI * 2);
+    ctx.fillStyle = g;
+    ctx.fill();
+
+    // Pulsing event-horizon ring
+    const pulse = 0.7 + Math.sin(t * Math.PI * 6) * 0.15;
+    ctx.save();
+    ctx.globalAlpha = pulse * (0.5 + t * 0.5);
+    ctx.strokeStyle = '#bb44ff';
+    ctx.lineWidth = 2.5 * zoom;
+    ctx.beginPath();
+    ctx.arc(s.x, s.y, r * 0.55, 0, Math.PI * 2);
+    ctx.stroke();
+    ctx.globalAlpha = 1;
+    ctx.restore();
+  }
 }
 
 // ============================================================
@@ -1057,6 +1115,10 @@ class Game {
     this.activeEffect = null; // 'fire' | 'laser' | 'ghost' | null
     // Frozen (ice) timer
     this.frozenTimer = 0;
+    // Black hole animation state
+    this.blackHoleAnim = 0;
+    this.blackHoleCX = 0;
+    this.blackHoleCY = 0;
     // Power multiplier
     this.powerMult = 1;
 
@@ -1137,6 +1199,10 @@ class Game {
     this.sfx.swing.volume = 0.7;
     this.sfx.hole.volume  = 0.7;
     this.sfx.fanfare.volume = 0.7;
+
+    // Goblin golfer sprite
+    this.goblinImg = new Image();
+    this.goblinImg.src = 'goblin_golfer.png';
 
     this.resize();
     this.bindEvents();
@@ -1356,7 +1422,7 @@ class Game {
       const sp = getPos(e);
 
       // Minimap tap/drag — single touch on minimap area
-      const mmStates = ['playing', 'rolling', 'sinking', 'fanfare'];
+      const mmStates = ['playing', 'rolling', 'sinking', 'fanfare', 'blackhole_anim'];
       if (mmStates.includes(this.state) && this._mmHit(sp.x, sp.y)) {
         this.minimapPanDrag = true;
         const wp = this._mmToWorld(sp.x, sp.y);
@@ -1400,6 +1466,7 @@ class Game {
       if (e.key === '1') this.activatePowerupSlot(0);
       if (e.key === '2') this.activatePowerupSlot(1);
       if (e.key === '3') this.activatePowerupSlot(2);
+      if (e.key === '4') this.activatePowerupSlot(3);
       if (e.key === 'Escape' && this.state === 'builder') this.exitBuilder();
     });
   }
@@ -1530,6 +1597,15 @@ class Game {
     const slot = this.powerupInventory[id];
     if (!slot || slot.uses <= 0) return;
 
+    // Black hole is an immediate effect — sucks up the ball and refunds the stroke.
+    if (id === 'blackhole') {
+      slot.uses--;
+      if (slot.uses <= 0) delete this.powerupInventory[id];
+      this.updatePowerupBar();
+      this.activateBlackHole();
+      return;
+    }
+
     // Ice is an immediate, non-shot effect — applied right now regardless of state.
     // fire/laser/ghost are queued as activeEffect and consume one use when the shot lands.
     if (id === 'ice') {
@@ -1580,6 +1656,61 @@ class Game {
     }
     this.activeEffect = null;
     this.updatePowerupBar();
+  }
+
+  activateBlackHole() {
+    const resetX = (this.lastSafePos || this.level.tee).x;
+    const resetY = (this.lastSafePos || this.level.tee).y;
+    const cx = this.ball.x;
+    const cy = this.ball.y;
+
+    // Refund the stroke if ball is mid-roll
+    if (this.state === 'rolling') {
+      this.strokes = Math.max(0, this.strokes - 1);
+    }
+
+    this.ball.vx = 0; this.ball.vy = 0;
+    this.activeEffect = null;
+    this.state = 'blackhole_anim';
+    this.blackHoleAnim = 0;
+    this.blackHoleCX = cx;
+    this.blackHoleCY = cy;
+
+    let t = 0;
+    const DURATION = 50;
+    const interval = setInterval(() => {
+      t++;
+      this.blackHoleAnim = Math.min(t / DURATION, 1);
+      // Spiral ball inward toward vortex center
+      this.ball.x = lerp(this.ball.x, cx, 0.18);
+      this.ball.y = lerp(this.ball.y, cy, 0.18);
+      // Orbiting dark particles
+      const angle = t * 0.45;
+      const pr = (1 - t / DURATION) * 38;
+      this.particles.emit(cx + Math.cos(angle) * pr, cy + Math.sin(angle) * pr, {
+        count: 3, color: '#110022', color2: '#9900ff',
+        minSpd: 0.2, maxSpd: 1.5, spread: 0.5,
+        minDecay: 0.04, maxDecay: 0.09,
+        minSize: 2, maxSize: 6, grav: 0
+      });
+      if (t >= DURATION) {
+        clearInterval(interval);
+        this.blackHoleAnim = 0;
+        this.ball.x = resetX;
+        this.ball.y = resetY;
+        this.ball.vx = 0; this.ball.vy = 0;
+        this.state = 'playing';
+        this.updateHUD();
+        this.camera.setTarget(this.ball.x, this.ball.y, Math.min(1.6, this.camera.zoom * 1.05));
+        // Arrival burst at reset position
+        this.particles.emit(resetX, resetY, {
+          count: 20, color: '#8800cc', color2: '#dd88ff',
+          minSpd: 1, maxSpd: 4, spread: 1,
+          minDecay: 0.04, maxDecay: 0.08,
+          minSize: 2, maxSize: 6
+        });
+      }
+    }, 16);
   }
 
   addPowerup(id) {
@@ -2221,7 +2352,20 @@ class Game {
         laser: { active: this.activeEffect === 'laser' },
         ghost: { active: this.activeEffect === 'ghost' }
       };
-      if (this.state === 'sinking' && this.sinkAnim > 0) {
+      if (this.state === 'blackhole_anim') {
+        // Black hole vortex — draw void then shrink ball into it
+        this.renderer.drawBlackHoleVortex(this.blackHoleCX, this.blackHoleCY, this.blackHoleAnim);
+        const bScale = 1 - this.blackHoleAnim;
+        if (bScale > 0.02) {
+          const s = this.camera.toScreen(this.ball.x, this.ball.y, this.canvas);
+          ctx.save();
+          ctx.translate(s.x, s.y);
+          ctx.scale(bScale, bScale);
+          ctx.translate(-s.x, -s.y);
+          this.renderer.drawBall(this.ball, pwEffects);
+          ctx.restore();
+        }
+      } else if (this.state === 'sinking' && this.sinkAnim > 0) {
         // Scale ball down around its screen position as it sinks
         const bScale = 1 - this.sinkAnim;
         const s = this.camera.toScreen(this.ball.x, this.ball.y, this.canvas);
@@ -2258,6 +2402,11 @@ class Game {
       }
     }
 
+    // Goblin golfer sprite at tee — visible before first shot only
+    if (this.strokes === 0 && (this.state === 'overview' || this.state === 'playing')) {
+      this.renderer.drawGoblinAtTee(this.level.tee, this.goblinImg);
+    }
+
     // Fanfare overlay
     this.drawFanfare(ctx);
 
@@ -2268,7 +2417,7 @@ class Game {
     }
 
     // Minimap (drawn last so it's on top)
-    const mmStates = ['playing', 'rolling', 'sinking', 'fanfare'];
+    const mmStates = ['playing', 'rolling', 'sinking', 'fanfare', 'blackhole_anim'];
     if (mmStates.includes(this.state)) {
       this.drawMinimap(ctx);
     }

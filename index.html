@@ -134,6 +134,8 @@
   .pu-card.ice:hover { box-shadow: 0 0 24px rgba(170,238,255,0.45); }
   .pu-card.ghost  { border-color: rgba(200,150,255,0.3); }
   .pu-card.ghost:hover { box-shadow: 0 0 24px rgba(200,150,255,0.45); }
+  .pu-card.blackhole { border-color: rgba(150,0,255,0.4); }
+  .pu-card.blackhole:hover { box-shadow: 0 0 28px rgba(150,0,255,0.6), 0 0 8px rgba(0,0,0,0.9); }
 
   /* Game over */
   #gameover-screen .go-title { font-size: 52px; font-weight: 900; color: #aaff66; margin-bottom: 8px; }
@@ -248,6 +250,16 @@
 
   /* Goblin taunt bar on title */
   .goblin-taunts { font-size: 13px; color: #88cc44; opacity: 0.6; margin-top: 10px; font-style: italic; text-align: center; }
+
+  /* Goblin golfer image on title screen */
+  #goblin-title-img {
+    width: 220px; display: block; margin: 0 auto -24px;
+    mix-blend-mode: screen; pointer-events: none;
+    filter: brightness(1.15) contrast(1.05);
+  }
+  @media (max-width: 500px) {
+    #goblin-title-img { width: 150px; margin-bottom: -16px; }
+  }
 
   /* Score table mobile scroll wrapper */
   .score-table-wrap { max-width: 100%; overflow-x: auto; }
@@ -445,7 +457,7 @@
 
 <!-- Title Screen -->
 <div id="title-screen" class="screen">
-  <div class="goblin-emoji">👺🏌️👺</div>
+  <img id="goblin-title-img" src="goblin_golfer.png" alt="Goblin Golfer">
   <h1 class="title">GOBLIN<br>GOLF</h1>
   <div class="subtitle">Procedural · 9 Burrows · Trinkets</div>
   <div class="goblin-taunts" id="goblin-taunt">"The shiniest ball goes in da hole!"</div>
