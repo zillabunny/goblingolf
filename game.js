@@ -8,6 +8,7 @@ const BALL_R       = 10;
 const CUP_R        = 14;
 const CUP_SINK_R   = 10;    // ball must be within this + moving slowly to hole
 const CUP_PULL_R   = 32;    // gravity-pull radius
+const VACUUM_RADIUS = Infinity; // vacuum suck ability range — dial in later
 const FRICTION     = 0.988; // per-frame rolling friction
 const FRICTION_SAND= 0.96;
 const BOUNCE       = 0.62;  // wall restitution
@@ -506,10 +507,17 @@ const POWERUP_DEFS = {
     desc: "Rip open a void — swallows the ball instantly. That stroke doesn't count.",
     persistent: false, uses: 1,
     key: '4'
+  },
+  vacuum: {
+    id: 'vacuum', name: 'Vacuum Suck',
+    icon: '🌀', cssClass: 'vacuum',
+    desc: 'Goblin cranks up the void sucker — ball gets yanked straight into the hole!',
+    persistent: false, uses: 1,
+    key: '5'
   }
 };
 
-const POWERUP_POOL = ['power', 'fire', 'laser', 'ice', 'ghost', 'blackhole'];
+const POWERUP_POOL = ['power', 'fire', 'laser', 'ice', 'ghost', 'blackhole', 'vacuum'];
 
 // ============================================================
 //  RENDERER
@@ -1530,6 +1538,7 @@ class Game {
       rolling: false
     };
     this.lastSafePos = { x: this.ball.x, y: this.ball.y };
+    this.shotStartPos = null;
 
     // Camera: zoom out to see full hole
     const z = this.camera.zoomForBounds(this.level.bounds, this.canvas);
@@ -1582,6 +1591,7 @@ class Game {
     const power  = clamp(d / (DRAG_SCALE / this.camera.zoom), 0, 1) * maxPow;
     const nx = dx/d, ny = dy/d;
 
+    this.shotStartPos = { x: this.ball.x, y: this.ball.y };
     this.ball.vx = nx * power;
     this.ball.vy = ny * power;
     this.ball.rolling = true;
@@ -1625,6 +1635,15 @@ class Game {
       if (slot.uses <= 0) delete this.powerupInventory[id];
       this.updatePowerupBar();
       this.activateBlackHole();
+      return;
+    }
+
+    // Vacuum suck is an immediate effect — yanks the ball into the hole.
+    if (id === 'vacuum') {
+      slot.uses--;
+      if (slot.uses <= 0) delete this.powerupInventory[id];
+      this.updatePowerupBar();
+      this.activateVacuumSuck();
       return;
     }
 
@@ -1681,8 +1700,8 @@ class Game {
   }
 
   activateBlackHole() {
-    const resetX = (this.lastSafePos || this.level.tee).x;
-    const resetY = (this.lastSafePos || this.level.tee).y;
+    const resetX = (this.shotStartPos || this.level.tee).x;
+    const resetY = (this.shotStartPos || this.level.tee).y;
     const cx = this.ball.x;
     const cy = this.ball.y;
 
@@ -1731,6 +1750,38 @@ class Game {
           minDecay: 0.04, maxDecay: 0.08,
           minSize: 2, maxSize: 6
         });
+      }
+    }, 16);
+  }
+
+  activateVacuumSuck() {
+    const cup = this.level.cup;
+    const d = dist(this.ball.x, this.ball.y, cup.x, cup.y);
+    if (d > VACUUM_RADIUS) return;
+
+    this.ball.vx = 0;
+    this.ball.vy = 0;
+    this.state = 'vacuum_anim';
+
+    let t = 0;
+    const DURATION = 40;
+    const interval = setInterval(() => {
+      t++;
+      const progress = t / DURATION;
+      this.ball.x = lerp(this.ball.x, cup.x, 0.1 + progress * 0.15);
+      this.ball.y = lerp(this.ball.y, cup.y, 0.1 + progress * 0.15);
+      this.particles.emit(this.ball.x, this.ball.y, {
+        count: 3, color: '#88aaff', color2: '#ffffff',
+        minSpd: 1, maxSpd: 4, spread: Math.PI * 2,
+        minDecay: 0.05, maxDecay: 0.1,
+        minSize: 1, maxSize: 3
+      });
+      if (t >= DURATION) {
+        clearInterval(interval);
+        this.ball.x = cup.x;
+        this.ball.y = cup.y;
+        this.state = 'playing';
+        this.sinkBall();
       }
     }, 16);
   }
@@ -2731,6 +2782,7 @@ class Game {
     this.dragging   = false; this.dragStart = null;
     this.ball = { x: lv.tee.x, y: lv.tee.y, vx:0, vy:0, rolling:false };
     this.lastSafePos = { x: this.ball.x, y: this.ball.y };
+    this.shotStartPos = null;
 
     const z  = this.camera.zoomForBounds(lv.bounds, this.canvas);
     const cx = lv.bounds.x + lv.bounds.w / 2;
