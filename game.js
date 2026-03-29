@@ -1,5 +1,9 @@
 'use strict';
 
+function trackEvent(name, params = {}) {
+  if (typeof gtag === 'function') gtag('event', name, params);
+}
+
 // ============================================================
 //  CONSTANTS
 // ============================================================
@@ -1503,6 +1507,7 @@ class Game {
 
   // ---- Game flow ----
   startGame() {
+    trackEvent('game_start');
     this.holeNum    = 1;
     this.totalScore = 0;
     this.scorecard  = [];
@@ -1634,6 +1639,7 @@ class Game {
       slot.uses--;
       if (slot.uses <= 0) delete this.powerupInventory[id];
       this.updatePowerupBar();
+      trackEvent('powerup_used', { powerup_id: id });
       this.activateBlackHole();
       return;
     }
@@ -1643,6 +1649,7 @@ class Game {
       slot.uses--;
       if (slot.uses <= 0) delete this.powerupInventory[id];
       this.updatePowerupBar();
+      trackEvent('powerup_used', { powerup_id: id });
       this.activateVacuumSuck();
       return;
     }
@@ -1661,6 +1668,7 @@ class Game {
       slot.uses--;
       if (slot.uses <= 0) delete this.powerupInventory[id];
       this.updatePowerupBar();
+      trackEvent('powerup_used', { powerup_id: id });
       // Emit ice particles over water cells
       if (this.level) {
         for (const c of this.level.cells) {
@@ -1684,6 +1692,7 @@ class Game {
       this.activeEffect = null;
     } else {
       this.activeEffect = id;
+      trackEvent('powerup_used', { powerup_id: id });
     }
     this.updatePowerupBar();
   }
@@ -2089,6 +2098,8 @@ class Game {
     else if (diff <= 0)  tier = 'par';
     else                 tier = 'none';
 
+    trackEvent('hole_complete', { hole: this.holeNum, par: this.level.par, strokes: this.strokes, score_tier: tier });
+
     if (tier === 'none') {
       this.holeComplete();
       return;
@@ -2327,6 +2338,7 @@ class Game {
   }
 
   showGameOver() {
+    trackEvent('game_complete', { total_score: this.totalScore, holes_played: this.scorecard.length });
     this.hideAdBanner();
     this.hideAllScreens();
     const screen = document.getElementById('gameover-screen');
