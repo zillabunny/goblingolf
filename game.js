@@ -2364,6 +2364,24 @@ class Game {
     this.state = 'gameover';
   }
 
+  shareScore() {
+    const diff   = this.totalScore;
+    const sign   = diff < 0 ? `${diff}` : diff === 0 ? 'E' : `+${diff}`;
+    const label  = diff < -5 ? 'Amazing round! 🏆' : diff < 0 ? 'Under par! 🔥' : diff === 0 ? 'Even par! ⛳' : 'Keep practicing! 💪';
+    const url    = window.location.href.split('?')[0];
+    const text   = `👺 Goblin Golf — ${sign} (${label})\nThink you can beat me? Play here: ${url}`;
+
+    if (navigator.share) {
+      navigator.share({ title: 'Goblin Golf', text }).catch(() => {});
+    } else {
+      navigator.clipboard.writeText(text).then(() => {
+        const toast = document.getElementById('share-toast');
+        toast.style.opacity = '1';
+        setTimeout(() => { toast.style.opacity = '0'; }, 2200);
+      }).catch(() => {});
+    }
+  }
+
   // ---- Hazard recovery ----
   updateHazard() {
     if (!this.inHazard) return;

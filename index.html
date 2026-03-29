@@ -148,6 +148,9 @@
   /* Game over */
   #gameover-screen .go-title { font-size: 52px; font-weight: 900; color: #aaff66; margin-bottom: 8px; }
   #gameover-screen .go-score { font-size: 20px; opacity: 0.8; margin-bottom: 36px; color: #ccff88; }
+  #share-btn { background: transparent; border: 2px solid rgba(170,255,102,0.5); color: #aaff66; font-size: 16px; padding: 10px 28px; border-radius: 8px; cursor: pointer; margin-left: 10px; transition: border-color 0.2s, box-shadow 0.2s; }
+  #share-btn:hover { border-color: #aaff66; box-shadow: 0 0 14px rgba(170,255,102,0.4); }
+  #share-toast { position: fixed; bottom: 32px; left: 50%; transform: translateX(-50%); background: #aaff66; color: #0a1205; font-weight: 700; padding: 10px 24px; border-radius: 8px; font-size: 15px; opacity: 0; pointer-events: none; transition: opacity 0.25s; }
   .score-table { border-collapse: collapse; margin-bottom: 32px; }
   .score-table td, .score-table th {
     padding: 8px 20px; text-align: center;
@@ -506,8 +509,12 @@
       <tr><th>Burrow</th><th>Scratch</th><th>Smacks</th><th>Pillage</th></tr>
     </table>
   </div>
-  <button class="btn" onclick="game.startGame()">👺 Raid Again!</button>
+  <div style="margin-top: 8px;">
+    <button class="btn" onclick="game.startGame()">👺 Raid Again!</button>
+    <button id="share-btn" onclick="game.shareScore()">🔗 Share Score</button>
+  </div>
 </div>
+<div id="share-toast">📋 Copied to clipboard!</div>
 
 
 <!-- In-game bottom banner ad -->
