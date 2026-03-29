@@ -856,23 +856,45 @@ class Renderer {
     ctx.fillRect(s.x + tw * 0.1, ty - fr * 0.18, tw, fr * 0.2);
   }
 
-  drawGoblinAtTee(tee, img) {
+  drawGoblinAtTee(tee, cup, img) {
     if (!img || !img.complete || img.naturalWidth === 0) return;
     const ctx = this.ctx;
-    const s = this.camera.toScreen(tee.x, tee.y, this.canvas);
+    const s   = this.camera.toScreen(tee.x, tee.y, this.canvas);
     const zoom = this.camera.zoom;
     const h = 72 * zoom;
     const w = h * (img.naturalWidth / img.naturalHeight);
-    // Position goblin so its feet sit near the tee center, offset left so club swings toward ball
-    const dx = -w * 0.35;
-    const dy = -h * 0.92;
+
+    // In the source image the goblin faces LEFT.
+    // Front foot (left foot) ≈ 15% from left edge.
+    // Back foot  (right foot) ≈ 72% from left edge.
+    const frontFrac = 0.15; // fraction from left when facing left
+    const backFrac  = 0.72; // fraction from left when facing left
+
+    // feet sit at ~95% down the image
+    const dy = -h * 0.95;
+
+    // Flip horizontally when the cup is to the right of the tee so goblin faces the hole
+    const facingRight = cup.x > tee.x;
+
     ctx.save();
-    // Drop shadow for depth
-    ctx.shadowColor = 'rgba(0,0,0,0.55)';
-    ctx.shadowBlur  = 8 * zoom;
-    ctx.shadowOffsetX = 2 * zoom;
-    ctx.shadowOffsetY = 3 * zoom;
-    ctx.drawImage(img, s.x + dx, s.y + dy, w, h);
+    ctx.shadowColor    = 'rgba(0,0,0,0.55)';
+    ctx.shadowBlur     = 8 * zoom;
+    ctx.shadowOffsetX  = 2 * zoom;
+    ctx.shadowOffsetY  = 3 * zoom;
+
+    if (facingRight) {
+      // Flip: translate pivot to tee screen pos, scale(-1,1), then draw.
+      // After scale(-1,1) a pixel at fraction f from image-left maps to
+      // screen_x = s.x - (lx + f*w).  To anchor the back foot (which becomes
+      // the front foot after flip) at s.x: lx = -backFrac * w.
+      ctx.translate(s.x, s.y + dy);
+      ctx.scale(-1, 1);
+      ctx.drawImage(img, -backFrac * w, 0, w, h);
+    } else {
+      // Natural orientation: anchor front (left) foot at s.x.
+      ctx.drawImage(img, s.x - frontFrac * w, s.y + dy, w, h);
+    }
+
     ctx.restore();
   }
 
@@ -2404,7 +2426,7 @@ class Game {
 
     // Goblin golfer sprite at tee — visible before first shot only
     if (this.strokes === 0 && (this.state === 'overview' || this.state === 'playing')) {
-      this.renderer.drawGoblinAtTee(this.level.tee, this.goblinImg);
+      this.renderer.drawGoblinAtTee(this.level.tee, this.level.cup, this.goblinImg);
     }
 
     // Fanfare overlay
