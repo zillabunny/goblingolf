@@ -2371,15 +2371,23 @@ class Game {
     const url    = window.location.href.split('?')[0];
     const text   = `👺 Goblin Golf — ${sign} (${label})\nThink you can beat me? Play here: ${url}`;
 
-    if (navigator.share) {
-      navigator.share({ title: 'Goblin Golf', text }).catch(() => {});
-    } else {
-      navigator.clipboard.writeText(text).then(() => {
-        const toast = document.getElementById('share-toast');
-        toast.style.opacity = '1';
-        setTimeout(() => { toast.style.opacity = '0'; }, 2200);
-      }).catch(() => {});
-    }
+    const showToast = () => {
+      const toast = document.getElementById('share-toast');
+      toast.style.opacity = '1';
+      setTimeout(() => { toast.style.opacity = '0'; }, 2200);
+    };
+
+    // Always copy to clipboard first, then try native share on touch devices
+    navigator.clipboard.writeText(text).then(() => {
+      showToast();
+      if (navigator.share && navigator.maxTouchPoints > 0) {
+        navigator.share({ title: 'Goblin Golf', text }).catch(() => {});
+      }
+    }).catch(() => {
+      if (navigator.share) {
+        navigator.share({ title: 'Goblin Golf', text }).catch(() => {});
+      }
+    });
   }
 
   // ---- Hazard recovery ----
