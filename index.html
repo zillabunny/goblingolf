@@ -11,7 +11,14 @@
   gtag('config', 'G-DF97NBR3VG');
 </script>
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Goblin Golf</title>
+<title>Goblin Golf 👺 — Free Minigolf with Trinkets</title>
+<meta name="description" content="Smash, loot, and dodge hazards across 9 procedural goblin burrows. Free to play in your browser.">
+<meta property="og:title" content="Goblin Golf 👺">
+<meta property="og:description" content="Procedural minigolf with trinkets & goblin chaos. 9 holes. Free to play.">
+<meta property="og:type" content="website">
+<meta name="twitter:card" content="summary_large_image">
+<meta name="twitter:title" content="Goblin Golf 👺">
+<meta name="twitter:description" content="Procedural minigolf with trinkets & goblin chaos. 9 holes. Free to play.">
 <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>👺</text></svg>">
 <style>
   * { margin: 0; padding: 0; box-sizing: border-box; }
@@ -144,6 +151,8 @@
   .pu-card.ghost:hover { box-shadow: 0 0 24px rgba(200,150,255,0.45); }
   .pu-card.blackhole { border-color: rgba(150,0,255,0.4); }
   .pu-card.blackhole:hover { box-shadow: 0 0 28px rgba(150,0,255,0.6), 0 0 8px rgba(0,0,0,0.9); }
+  .pu-card.waterjump { border-color: rgba(68,200,120,0.35); }
+  .pu-card.waterjump:hover { box-shadow: 0 0 24px rgba(68,200,120,0.5); }
 
   /* Game over */
   #gameover-screen .go-title { font-size: 52px; font-weight: 900; color: #aaff66; margin-bottom: 8px; }
@@ -151,6 +160,11 @@
   #share-btn { background: transparent; border: 2px solid rgba(170,255,102,0.5); color: #aaff66; font-size: 16px; padding: 10px 28px; border-radius: 8px; cursor: pointer; margin-left: 10px; transition: border-color 0.2s, box-shadow 0.2s; }
   #share-btn:hover { border-color: #aaff66; box-shadow: 0 0 14px rgba(170,255,102,0.4); }
   #share-toast { position: fixed; bottom: 32px; left: 50%; transform: translateX(-50%); background: #aaff66; color: #0a1205; font-weight: 700; padding: 10px 24px; border-radius: 8px; font-size: 15px; opacity: 0; pointer-events: none; transition: opacity 0.25s; }
+  .gg2-teaser { margin-top: 28px; padding: 16px 24px; border: 1px solid rgba(255,180,40,0.25); border-radius: 12px; background: rgba(255,140,0,0.06); text-align: center; }
+  .gg2-title { font-size: 17px; font-weight: 800; color: #ffcc44; margin-bottom: 4px; }
+  .gg2-games { font-size: 12px; opacity: 0.6; color: #ffdd88; letter-spacing: 1px; margin-bottom: 12px; }
+  .gg2-btn { display: inline-block; background: linear-gradient(135deg, #ff9900, #cc6600); color: #fff; font-weight: 700; font-size: 14px; padding: 9px 22px; border-radius: 8px; text-decoration: none; letter-spacing: 0.5px; transition: box-shadow 0.2s; }
+  .gg2-btn:hover { box-shadow: 0 0 18px rgba(255,150,0,0.55); }
   .score-table { border-collapse: collapse; margin-bottom: 32px; }
   .score-table td, .score-table th {
     padding: 8px 20px; text-align: center;
@@ -470,10 +484,13 @@
 <div id="title-screen" class="screen">
   <img id="goblin-title-img" src="goblin_golfer.png" alt="Goblin Golfer">
   <h1 class="title">GOBLIN<br>GOLF</h1>
-  <div class="subtitle">Procedural · 9 Burrows · Trinkets</div>
+  <div class="subtitle">9 Burrows · Trinkets · The Goblin Universe Begins</div>
   <div class="goblin-taunts" id="goblin-taunt">"The shiniest ball goes in da hole!"</div>
   <button class="btn" style="margin-top:28px" onclick="game.startGame(); game.music.play()">SMASH IT! 👺</button>
-  <button class="btn secondary" onclick="game.enterBuilder()">🔨 Level Builder</button>
+  <div style="margin-top: 8px;">
+    <a href="https://goblingames.gg" target="_blank" rel="noopener" style="color:#66aa33; font-size:12px; opacity:0.55; text-decoration:none; letter-spacing:1px;">🔥 Goblin Golf 2 coming soon →</a>
+  </div>
+  <button class="btn secondary" style="margin-top:18px; font-size:12px; opacity:0.5; padding:8px 18px;" onclick="game.enterBuilder()">🔨 Level Builder</button>
   <div style="margin-top: 24px; opacity: 0.38; font-size: 12px; text-align: center; line-height: 1.9; color:#aabb88;">
     Drag near ball to aim · Release to smack<br>
     Tap minimap to pan · 1/2/3 for trinkets<br>
@@ -512,6 +529,11 @@
   <div style="margin-top: 8px;">
     <button class="btn" onclick="game.startGame()">👺 Raid Again!</button>
     <button id="share-btn" onclick="game.shareScore()">🔗 Share Score</button>
+  </div>
+  <div class="gg2-teaser">
+    <div class="gg2-title">👺 Goblin Golf 2 is Coming</div>
+    <div class="gg2-games">Goblin Volleyball · Goblin Pool · Goblin Dodgeball</div>
+    <a class="gg2-btn" href="https://goblingames.gg" target="_blank" rel="noopener">Get Early Access →</a>
   </div>
 </div>
 <div id="share-toast">📋 Copied to clipboard!</div>

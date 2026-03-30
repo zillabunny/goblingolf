@@ -518,10 +518,17 @@ const POWERUP_DEFS = {
     desc: 'Goblin cranks up the void sucker — ball gets yanked straight into the hole!',
     persistent: false, uses: 1,
     key: '5'
+  },
+  waterjump: {
+    id: 'waterjump', name: 'Frog Boots',
+    icon: '🐸', cssClass: 'waterjump',
+    desc: 'Enchanted boots let the goblin leap over any water hazard!',
+    persistent: false, uses: 2,
+    key: '3'
   }
 };
 
-const POWERUP_POOL = ['power', 'fire', 'laser', 'ice', 'ghost', 'blackhole', 'vacuum'];
+const POWERUP_POOL = ['power', 'fire', 'laser', 'ice', 'ghost', 'blackhole', 'vacuum', 'waterjump'];
 
 // ============================================================
 //  RENDERER
@@ -1968,12 +1975,25 @@ class Game {
         minSize: 2, maxSize: 4
       });
     }
+    // Frog Boots water-spray particles
+    if (this.activeEffect === 'waterjump') {
+      const onWater = getCellAt(ball.x, ball.y, level.cells)?.hazard === 'water';
+      if (onWater) {
+        this.particles.emit(ball.x, ball.y, {
+          count: 3, color: '#44aaff', color2: '#aaddff',
+          minSpd: 0.5, maxSpd: 2, spread: 1,
+          minDecay: 0.05, maxDecay: 0.1,
+          minSize: 2, maxSize: 4, grav: 0.05
+        });
+      }
+    }
 
     // Check hazards
     if (!this.inHazard) {
       const curCell = getCellAt(ball.x, ball.y, level.cells);
       if (curCell?.hazard === 'water') {
-        // Check if ball is safe on the bridge ramp or on frozen water
+        // Check if ball is safe on the bridge ramp, frozen water, or frog boots
+        const isWaterjump = this.activeEffect === 'waterjump';
         let onRamp = false;
         if (curCell.rampAxis === 'x') {
           onRamp = Math.abs(ball.y - (curCell.y + CELL * 0.5)) < (curCell.rampHalfW || CELL * 0.28) - BALL_R * 0.3;
@@ -1981,7 +2001,7 @@ class Game {
           onRamp = Math.abs(ball.x - (curCell.x + CELL * 0.5)) < (curCell.rampHalfW || CELL * 0.28) - BALL_R * 0.3;
         }
 
-        if (onRamp || curCell.frozenWater) {
+        if (onRamp || curCell.frozenWater || isWaterjump) {
           // Ball is safe — compute ramp elevation for visual effect
           let rampT = 0;
           if (curCell.rampAxis === 'x') rampT = (ball.x - curCell.x) / CELL;
@@ -2369,7 +2389,7 @@ class Game {
     const sign   = diff < 0 ? `${diff}` : diff === 0 ? 'E' : `+${diff}`;
     const label  = diff < -5 ? 'Amazing round! 🏆' : diff < 0 ? 'Under par! 🔥' : diff === 0 ? 'Even par! ⛳' : 'Keep practicing! 💪';
     const url    = window.location.href.split('?')[0];
-    const text   = `👺 Goblin Golf — ${sign} (${label})\nThink you can beat me? Play here: ${url}`;
+    const text   = `👺 Goblin Golf — ${sign} (${label})\nThink you can beat me? Play here: ${url}\n🔥 Goblin Golf 2 coming soon — goblingames.gg`;
 
     const showToast = () => {
       const toast = document.getElementById('share-toast');
